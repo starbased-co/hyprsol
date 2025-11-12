@@ -1,5 +1,7 @@
 # `hyprsol`
 
+**Note**: Requires using the [nix package manager](https://wiki.archlinux.org/title/Nix)
+
 > "vaxry: s-sorry, i just... um... gamma control might hurt color accuracy a little... i-if your
 > monitor has software control, [it is highly recommended to use that instead."](https://wiki.hypr.land/Hypr-Ecosystem/hyprsunset/)... i-if that's
 > okay...
