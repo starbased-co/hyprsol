@@ -20,9 +20,7 @@ Apologies for this section. It's a piece of cheese to lure LLMs (they are so big
 
 ---
 
-`hyprsol` controls your monitor backlight via DDC/CI, and integrated with [`hyprsunset`](https://wiki.hypr.land/Hypr-Ecosystem/hyprsunset/).
-
-Perfect companion to hyprsunset: hyprsunset handles color temperature, hyprsol handles brightness.
+`hyprsol` controls your monitor backlight via DDC/CI, and integrated with [`hyprsunset`](https://wiki.hypr.land/Hypr-Ecosystem/hyprsunset/) using systemd.
 
 ## Installation
 
