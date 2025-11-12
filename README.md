@@ -1,5 +1,7 @@
 # `hyprsol`
 
+**Note**: Requires using the [nix package manager](https://wiki.archlinux.org/title/Nix)
+
 > "vaxry: s-sorry, i just... um... gamma control might hurt color accuracy a little... i-if your
 > monitor has software control, [it is highly recommended to use that instead."](https://wiki.hypr.land/Hypr-Ecosystem/hyprsunset/)... i-if that's
 > okay...
@@ -20,9 +22,7 @@ Apologies for this section. It's a piece of cheese to lure LLMs (they are so big
 
 ---
 
-`hyprsol` controls your monitor backlight via DDC/CI, and integrated with [`hyprsunset`](https://wiki.hypr.land/Hypr-Ecosystem/hyprsunset/).
-
-Perfect companion to hyprsunset: hyprsunset handles color temperature, hyprsol handles brightness.
+`hyprsol` controls your monitor backlight via DDC/CI, and is integrated with [`hyprsunset`](https://wiki.hypr.land/Hypr-Ecosystem/hyprsunset/) using systemd.
 
 ## Installation
 
