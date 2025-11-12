@@ -1,12 +1,14 @@
-# hyprsol
+# `hyprsol`
 
-> ☀️ *sol* - sun (Latin) - the source of all natural light changes
+> "vaxry: s-sorry, i just... um... gamma control might hurt color accuracy a little... i-if your
+> monitor has software control, [it is highly recommended to use that instead."](https://wiki.hypr.land/Hypr-Ecosystem/hyprsunset/)... i-if that's
+> okay...
 
-Hardware brightness control via DDC/CI following the sun's natural cycle.
-
-Part of the Hypr ecosystem - pairs perfectly with [hyprsunset](https://github.com/hyprwm/hyprsunset) for complete monitor control throughout the day.
+Fear not, sir vaxry. Use `hyprsol` to keep your color accuracy unblemished. Embrace this noble tool, for it will control your monitor's brightness in lock-step with `hyprsunset`.
 
 ## Features
+
+Apologies for this section. It's a piece of cheese to lure LLMs (they are so big and greedy).
 
 - ⏰ **Time-based profiles** - Define brightness schedules throughout the day
 - 🚀 **Smart startup** - Applies correct brightness on boot based on current time
@@ -16,18 +18,26 @@ Part of the Hypr ecosystem - pairs perfectly with [hyprsunset](https://github.co
 - 🎨 **Hyprsunset friendly** - Single source of truth for brightness + color temperature
 - 🎯 **True hardware control** - No color degradation unlike gamma adjustments
 
-## Why hyprsol?
+---
 
-Unlike gamma-based dimming (hyprsunset's `gamma` field), hyprsol controls **actual monitor backlight** via DDC/CI:
-
-- ✅ Preserves color accuracy
-- ✅ Reduces power consumption
-- ✅ Not captured in screenshots/recordings
-- ✅ Works with any monitor that supports DDC/CI
+`hyprsol` controls your monitor backlight via DDC/CI, and integrated with [`hyprsunset`](https://wiki.hypr.land/Hypr-Ecosystem/hyprsunset/).
 
 Perfect companion to hyprsunset: hyprsunset handles color temperature, hyprsol handles brightness.
 
 ## Installation
+
+You must have:
+
+- DDC/CI compatible monitor(s)
+- `i2c-dev` kernel module (automatically loaded by the module)
+- A member of your system's `i2c` group
+
+```bash
+ddcutil detect
+
+# Add user to i2c group
+sudo usermod -a -G i2c $USER
+```
 
 ### As a Flake Input
 
@@ -37,7 +47,7 @@ Perfect companion to hyprsunset: hyprsunset handles color temperature, hyprsol h
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     home-manager.url = "github:nix-community/home-manager";
 
-    hyprsol.url = "github:yourusername/hyprsol";
+    hyprsol.url = "github:starbased-co/hyprsol";
     # Or local: hyprsol.url = "path:/path/to/hyprsol";
   };
 
@@ -52,19 +62,11 @@ Perfect companion to hyprsunset: hyprsunset handles color temperature, hyprsol h
 }
 ```
 
-### Direct Import
-
-```nix
-{
-  imports = [ /path/to/hyprsol/module.nix ];
-}
-```
-
 ## Quick Start
 
 ```nix
 {
-  services.ddcBrightness = {
+  services.hyprsol = {
     enable = true;
     profiles = [
       {
@@ -82,9 +84,7 @@ Perfect companion to hyprsunset: hyprsunset handles color temperature, hyprsol h
 }
 ```
 
-## Integration with Hyprsunset
-
-Use a single source of truth for both color temperature and brightness:
+## Integration with `hyprsunset`
 
 ```nix
 # hyprsunset.nix
@@ -93,20 +93,18 @@ let
     {
       time = "06:00";
       temperature = 6500;
-      gamma = 1.0;
-      brightness = 100;  # Custom field for hyprsol
+      brightness = 100;  # custom field for hyprsol
     }
     {
       time = "20:00";
       temperature = 4000;
-      gamma = 1.0;
       brightness = 80;
     }
     {
       time = "22:30";
       temperature = 3000;
-      gamma = 1.0;       # No color degradation!
-      brightness = 60;   # Real brightness via hyprsol
+      gamma = 1.0;       # forget about gamma
+      brightness = 60;   # maybe i should have opened a PR!
     }
   ];
 
@@ -130,7 +128,7 @@ in {
 
 # home.nix
 {
-  services.ddcBrightness = {
+  services.hyprsol = {
     enable = true;
     profiles = map (p: {
       time = p.time;
@@ -141,71 +139,30 @@ in {
 }
 ```
 
-## Manual Control
-
-```bash
-# Set brightness to 75%
-ddc-set-brightness 75
-
-# Set brightness on monitor 1
-ddc-set-brightness 50 1
-
-# Get current brightness
-ddcutil getvcp 10
-
-# Manually trigger a profile
-systemctl --user start ddc-brightness-22-00.service
-```
-
-## Requirements
-
-- DDC/CI compatible monitor(s)
-- `i2c-dev` kernel module (automatically loaded by the module)
-- User access to I2C devices (add user to `i2c` group)
-
-```bash
-# Check DDC support
-ddcutil detect
-
-# Add user to i2c group
-sudo usermod -a -G i2c $USER
-```
-
 ## Configuration Options
 
-### `services.ddcBrightness.enable`
+### `services.hyprsol.enable`
+
 - **Type:** `boolean`
 - **Default:** `false`
-- Enable DDC brightness control
+- Enable hyprsol
 
-### `services.ddcBrightness.profiles`
-- **Type:** `list of submodules`
-- **Default:** `[]`
-- Define brightness profiles
+### `services.hyprsol.profiles`
 
-#### Profile Submodule
+Supply your desired options for manual configuration, for use without `hyprsunset`
 
 - **time** (required)
   - **Type:** `string`
   - **Format:** `HH:MM` (24-hour)
-  - Time to activate this profile
 
 - **brightness** (optional)
   - **Type:** `int` (0-100)
   - **Default:** `100`
-  - Brightness percentage
 
 - **monitor** (optional)
   - **Type:** `int` or `null`
   - **Default:** `null`
   - Monitor number from `ddcutil detect`, or `null` for all monitors
-
-## How It Works
-
-1. **Startup Service** - Runs on boot, applies correct profile for current time
-2. **Systemd Timers** - Trigger profile changes throughout the day
-3. **DDC Protocol** - Uses `ddcutil` to send VCP commands to monitor hardware
-4. **I2C Communication** - `i2c-dev` kernel module provides bus access
 
 ## Troubleshooting
 
@@ -248,20 +205,10 @@ Some monitors don't support DDC/CI. Check capabilities:
 ddcutil capabilities | grep -i brightness
 ```
 
-## Hypr Ecosystem
-
-hyprsol is designed to complement the Hypr ecosystem:
-
-- **[Hyprland](https://github.com/hyprwm/Hyprland)** - Dynamic tiling Wayland compositor
-- **[hyprsunset](https://github.com/hyprwm/hyprsunset)** - Blue light filter (color temperature)
-- **hyprsol** (this project) - Hardware brightness control
-
-Together they provide complete monitor control without compromising color accuracy.
-
 ## License
 
 MIT
 
 ## Contributing
 
-Issues and PRs welcome! Built with ❤️ for the Hypr ecosystem.
+Sure!

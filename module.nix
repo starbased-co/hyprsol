@@ -6,8 +6,8 @@
 }:
 
 let
-  # DDC brightness control script
-  ddcBrightnessScript = pkgs.writeShellScript "ddc-brightness" ''
+  # Set brightness
+  hyprsolSet = pkgs.writeShellScript "hyprsol-set" ''
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -23,49 +23,49 @@ let
     fi
   '';
 
-  # Script to apply current brightness profile based on time of day
-  applyCurrentProfileScript = cfg: pkgs.writeShellScript "ddc-apply-current" ''
-    #!/usr/bin/env bash
-    set -euo pipefail
+  # Sets profile based on time of day
+  hyprsolSetNow =
+    cfg:
+    pkgs.writeShellScript "hyprsol-set-now" ''
+      #!/usr/bin/env bash
+      set -euo pipefail
 
-    # Get current time in HHMM format
-    CURRENT_TIME=$(date +%H%M)
+      CURRENT_TIME=$(date +%H%M)
 
-    # Profile times and brightness values (sorted by time)
-    ${lib.concatMapStringsSep "\n" (profile:
-      let
-        timeNum = builtins.replaceStrings [":"] [""] profile.time;
-      in
-      "PROFILE_${timeNum}=${toString profile.brightness}"
-    ) (lib.sort (a: b: a.time < b.time) cfg.profiles)}
+      ${lib.concatMapStringsSep "\n" (
+        profile:
+        let
+          timeNum = builtins.replaceStrings [ ":" ] [ "" ] profile.time;
+        in
+        "PROFILE_${timeNum}=${toString profile.brightness}"
+      ) (lib.sort (a: b: a.time < b.time) cfg.profiles)}
 
-    # Find the most recent profile that should be active
-    BRIGHTNESS=100  # Default
+      BRIGHTNESS=100  # Default value for when no hyprsunset profiles are configured
 
-    ${lib.concatMapStringsSep "\n" (profile:
-      let
-        timeNum = builtins.replaceStrings [":"] [""] profile.time;
-      in
-      ''
-      if [[ "$CURRENT_TIME" -ge "${timeNum}" ]]; then
-        BRIGHTNESS=$PROFILE_${timeNum}
-      fi
-      ''
-    ) (lib.sort (a: b: a.time < b.time) cfg.profiles)}
+      ${lib.concatMapStringsSep "\n" (
+        profile:
+        let
+          timeNum = builtins.replaceStrings [ ":" ] [ "" ] profile.time;
+        in
+        ''
+          if [[ "$CURRENT_TIME" -ge "${timeNum}" ]]; then
+            BRIGHTNESS=$PROFILE_${timeNum}
+          fi
+        ''
+      ) (lib.sort (a: b: a.time < b.time) cfg.profiles)}
 
-    # Apply the brightness
-    ${ddcBrightnessScript} "$BRIGHTNESS"
-  '';
+      # apply
+      ${hyprsolSet} "$BRIGHTNESS"
+    '';
 
-  # Time-based brightness profile service generator
-  makeBrightnessService = profile: {
+  mkHyprsolService = profile: {
     Unit = {
-      Description = "DDC Brightness Profile - ${profile.time}";
+      Description = "hyprsol - ${profile.time}";
       After = [ "graphical-session.target" ];
     };
     Service = {
       Type = "oneshot";
-      ExecStart = "${ddcBrightnessScript} ${toString profile.brightness} ${
+      ExecStart = "${hyprsolSet} ${toString profile.brightness} ${
         if profile.monitor != null then toString profile.monitor else ""
       }";
       # Ensure i2c-dev module is loaded
@@ -73,15 +73,14 @@ let
     };
   };
 
-  # Timer for each brightness profile
-  makeBrightnessTimer = profile: {
+  mkHyprsolTimer = profile: {
     Unit = {
-      Description = "DDC Brightness Timer - ${profile.time}";
+      Description = "hyprsol timer - ${profile.time}";
     };
     Timer = {
       OnCalendar = profile.time;
       Persistent = true;
-      Unit = "ddc-brightness-${builtins.replaceStrings [ ":" ] [ "-" ] profile.time}.service";
+      Unit = "hyprsol-brightness-${builtins.replaceStrings [ ":" ] [ "-" ] profile.time}.service";
     };
     Install = {
       WantedBy = [ "timers.target" ];
@@ -107,11 +106,11 @@ let
     }
   ];
 
-  cfg = config.services.ddcBrightness;
+  cfg = config.services.hyprsol;
 in
 {
-  options.services.ddcBrightness = {
-    enable = lib.mkEnableOption "DDC/CI monitor brightness control";
+  options.services.hyprsol = {
+    enable = lib.mkEnableOption "hyprsol - DDC/CI monitor brightness for Hyprland with hyprsunset support";
 
     profiles = lib.mkOption {
       type = lib.types.listOf (
@@ -142,35 +141,33 @@ in
 
   config = lib.mkIf cfg.enable {
     # Install ddcutil package and helper script
-    home.packages =
-      with pkgs;
-      [
-        ddcutil
-        (pkgs.writeShellScriptBin "ddc-set-brightness" ''
-          ${ddcBrightnessScript} "$@"
-        '')
-      ];
+    home.packages = with pkgs; [
+      ddcutil
+      (pkgs.writeShellScriptBin "hyprsol-set" ''
+        ${hyprsolSet} "$@"
+      '')
+    ];
 
     # Create systemd services for each profile
     systemd.user.services = lib.mkMerge [
       # Individual timer services
       (lib.listToAttrs (
         map (profile: {
-          name = "ddc-brightness-${builtins.replaceStrings [ ":" ] [ "-" ] profile.time}";
-          value = makeBrightnessService profile;
+          name = "hyprsol-${builtins.replaceStrings [ ":" ] [ "-" ] profile.time}";
+          value = mkHyprsolService profile;
         }) cfg.profiles
       ))
 
       # Startup service to apply current profile immediately
       {
-        ddc-brightness-startup = {
+        hyprsol = {
           Unit = {
-            Description = "Apply current DDC brightness profile on startup";
+            Description = "Startup service for hyprsol";
             After = [ "graphical-session.target" ];
           };
           Service = {
             Type = "oneshot";
-            ExecStart = "${applyCurrentProfileScript cfg}";
+            ExecStart = "${hyprsolSetNow cfg}";
             ExecStartPre = "${pkgs.kmod}/bin/modprobe i2c-dev";
           };
           Install = {
@@ -183,20 +180,9 @@ in
     # Create systemd timers for each profile
     systemd.user.timers = lib.listToAttrs (
       map (profile: {
-        name = "ddc-brightness-${builtins.replaceStrings [ ":" ] [ "-" ] profile.time}";
-        value = makeBrightnessTimer profile;
+        name = "hyprsol-${builtins.replaceStrings [ ":" ] [ "-" ] profile.time}";
+        value = mkHyprsolTimer profile;
       }) cfg.profiles
     );
-
-    # Hyprland keybindings for manual brightness control
-    wayland.windowManager.hyprland.settings = {
-      # Use XF86MonBrightness keys if available, or custom bindings
-      bindel = [
-        # Decrease brightness by 5%
-        ",XF86MonBrightnessDown,exec,${ddcBrightnessScript} $(( $(${pkgs.ddcutil}/bin/ddcutil getvcp 10 --brief | ${pkgs.gawk}/bin/awk '{print $4}') - 5 ))"
-        # Increase brightness by 5%
-        ",XF86MonBrightnessUp,exec,${ddcBrightnessScript} $(( $(${pkgs.ddcutil}/bin/ddcutil getvcp 10 --brief | ${pkgs.gawk}/bin/awk '{print $4}') + 5 ))"
-      ];
-    };
   };
 }
