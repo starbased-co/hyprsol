@@ -80,7 +80,7 @@ let
     Timer = {
       OnCalendar = profile.time;
       Persistent = true;
-      Unit = "hyprsol-brightness-${builtins.replaceStrings [ ":" ] [ "-" ] profile.time}.service";
+      Unit = "hyprsol-${builtins.replaceStrings [ ":" ] [ "-" ] profile.time}.service";
     };
     Install = {
       WantedBy = [ "timers.target" ];
