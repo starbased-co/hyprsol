@@ -109,9 +109,10 @@ let
   ];
 
   # Filter out brightness for hyprsunset
-  hyprsunsetProfiles = map (p: {
-    inherit (p) time temperature gamma;
-  }) profiles;
+  hyprsunsetProfiles = map (p:
+    { inherit (p) time temperature; }
+    // lib.optionalAttrs (p ? gamma) { gamma = p.gamma; }
+  ) profiles;
 in {
   options.hyprsunset.profiles = lib.mkOption {
     default = profiles;
