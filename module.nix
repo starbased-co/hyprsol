@@ -58,6 +58,31 @@ let
       ${hyprsolSet} "$BRIGHTNESS"
     '';
 
+  # Monitor wake listener - restores brightness when monitors wake from DPMS
+  hyprsolWake =
+    cfg:
+    pkgs.writeShellScript "hyprsol-wake" ''
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      SOCKET="$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock"
+
+      if [[ ! -S "$SOCKET" ]]; then
+        echo "Error: Hyprland event socket not found at $SOCKET" >&2
+        exit 1
+      fi
+
+      echo "hyprsol-wake: Listening for DPMS events..."
+
+      ${pkgs.socat}/bin/socat -U - "UNIX-CONNECT:$SOCKET" | while read -r line; do
+        # Parse events: monitoradded>>MONITOR or dpms>>MONITOR,STATE
+        if [[ "$line" =~ ^monitoradded ]] || [[ "$line" =~ ^dpms.*,1$ ]]; then
+          echo "hyprsol-wake: Monitor wake detected, restoring brightness..."
+          ${hyprsolSetNow cfg} || echo "hyprsol-wake: Failed to restore brightness" >&2
+        fi
+      done
+    '';
+
   mkHyprsolService = profile: {
     Unit = {
       Description = "hyprsol - ${profile.time}";
@@ -137,6 +162,12 @@ in
       default = defaultProfiles;
       description = "Time-based brightness profiles";
     };
+
+    restoreOnWake = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Restore brightness when monitors wake from DPMS";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -175,6 +206,26 @@ in
           };
         };
       }
+
+      # Monitor wake listener service
+      (lib.mkIf cfg.restoreOnWake {
+        hyprsol-wake = {
+          Unit = {
+            Description = "hyprsol monitor wake listener";
+            After = [ "graphical-session.target" ];
+            PartOf = [ "graphical-session.target" ];
+          };
+          Service = {
+            Type = "simple";
+            ExecStart = "${hyprsolWake cfg}";
+            Restart = "on-failure";
+            RestartSec = 5;
+          };
+          Install = {
+            WantedBy = [ "graphical-session.target" ];
+          };
+        };
+      })
     ];
 
     # Create systemd timers for each profile
